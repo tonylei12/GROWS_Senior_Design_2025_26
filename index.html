@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Grows Rover Control</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at top left, rgba(0, 255, 150, 0.16), transparent 30%),
+                radial-gradient(circle at bottom right, rgba(0, 132, 255, 0.18), transparent 36%),
+                #07110d;
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Arial, sans-serif;
+            text-align: center;
+            overflow-y: auto;
+        }
+
+        .app-shell {
+            width: 100%;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 10px;
+        }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 8px 8px;
+        }
+
+        .title-block {
+            text-align: left;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 27px;
+            font-weight: 850;
+            letter-spacing: -0.7px;
+            line-height: 1.05;
+        }
+
+        .subtitle {
+            margin-top: 4px;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.62);
+            font-weight: 500;
+        }
+
+        #status {
+            padding: 8px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #b8ffd8;
+            white-space: nowrap;
+        }
+
+        .main-layout {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .camera-card,
+        .control-card,
+        .water-card {
+            width: 100%;
+            max-width: 520px;
+            background: rgba(255, 255, 255, 0.075);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 22px;
+            padding: 10px;
+            box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+            backdrop-filter: blur(14px);
+        }
+
+        .camera-header,
+        .control-header,
+        .water-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 2px 4px 9px;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.7);
+            font-weight: 700;
+        }
+
+        .live-pill {
+            font-size: 11px;
+            color: #08110d;
+            background: #65ffae;
+            border-radius: 999px;
+            padding: 4px 9px;
+            font-weight: 850;
+            letter-spacing: 0.4px;
+        }
+
+        .ai-pill {
+            font-size: 11px;
+            color: #08110d;
+            background: linear-gradient(135deg, #65ffae, #00c2ff);
+            border-radius: 999px;
+            padding: 4px 9px;
+            font-weight: 850;
+            letter-spacing: 0.4px;
+        }
+
+        .camera-box {
+            width: 100%;
+            height: 32vh;
+            min-height: 180px;
+            max-height: 280px;
+            border-radius: 16px;
+            overflow: hidden;
+            background: #000;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+        }
+
+        .camera-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .main {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #joystick-area {
+            width: 185px;
+            height: 185px;
+            background:
+                radial-gradient(circle, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+                #111b17;
+            border-radius: 50%;
+            position: relative;
+            border: 2px solid rgba(101, 255, 174, 0.35);
+            box-shadow:
+                inset 0 0 35px rgba(101, 255, 174, 0.08),
+                0 0 25px rgba(0, 0, 0, 0.35);
+            touch-action: none;
+        }
+
+        #joystick-area::before,
+        #joystick-area::after {
+            content: "";
+            position: absolute;
+            background: rgba(255, 255, 255, 0.10);
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        #joystick-area::before {
+            width: 70%;
+            height: 1px;
+        }
+
+        #joystick-area::after {
+            width: 1px;
+            height: 70%;
+        }
+
+        #stick {
+            width: 62px;
+            height: 62px;
+            background:
+                radial-gradient(circle at 35% 30%, #ffffff, #65ffae 24%, #00a96b 78%);
+            border-radius: 50%;
+            position: absolute;
+            left: 61.5px;
+            top: 61.5px;
+            box-shadow:
+                0 0 22px rgba(101, 255, 174, 0.65),
+                0 8px 18px rgba(0, 0, 0, 0.45);
+            z-index: 2;
+        }
+
+        .command-display {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.75);
+            font-weight: 700;
+        }
+
+        #current-command {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 28px;
+            padding: 3px 8px;
+            margin-left: 4px;
+            border-radius: 999px;
+            background: rgba(101, 255, 174, 0.16);
+            color: #65ffae;
+            font-weight: 850;
+        }
+
+        .buttons {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            width: 100%;
+            margin-top: 2px;
+        }
+
+        button {
+            font-size: 15px;
+            padding: 13px 8px;
+            border: none;
+            border-radius: 15px;
+            color: white;
+            font-weight: 850;
+            letter-spacing: -0.2px;
+            min-width: 0;
+            box-shadow: 0 10px 22px rgba(0, 0, 0, 0.28);
+        }
+
+        button:active {
+            transform: scale(0.96);
+            filter: brightness(1.18);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            transform: none;
+            filter: none;
+        }
+
+        .pump {
+            background: linear-gradient(135deg, #0b78ff, #00c2ff);
+        }
+
+        .seed {
+            background: linear-gradient(135deg, #00a96b, #69ff9c);
+            color: #06130c;
+        }
+
+        .seed-stop {
+            background: linear-gradient(135deg, #d63b3b, #ff7a59);
+        }
+
+        /* ============== Watering recommendation panel ============== */
+        .water-body {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 4px 4px 6px;
+        }
+
+        .get-rec-btn {
+            width: 100%;
+            padding: 13px;
+            font-size: 15px;
+            background: linear-gradient(135deg, #00a96b, #69ff9c);
+            color: #06130c;
+        }
+
+        .rec-result {
+            display: none;
+            padding: 14px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.10);
+            text-align: left;
+        }
+
+        .rec-result.is-water {
+            border-color: rgba(0, 194, 255, 0.45);
+            background: linear-gradient(135deg, rgba(11, 120, 255, 0.18), rgba(0, 194, 255, 0.08));
+        }
+
+        .rec-result.is-skip {
+            border-color: rgba(101, 255, 174, 0.45);
+            background: linear-gradient(135deg, rgba(0, 169, 107, 0.18), rgba(101, 255, 174, 0.08));
+        }
+
+        .rec-headline {
+            font-size: 18px;
+            font-weight: 850;
+            letter-spacing: -0.3px;
+            margin: 0 0 4px 0;
+        }
+
+        .rec-result.is-water .rec-headline {
+            color: #7ed7ff;
+        }
+
+        .rec-result.is-skip .rec-headline {
+            color: #65ffae;
+        }
+
+        .rec-confidence {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.7);
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .rec-confidence strong {
+            color: white;
+        }
+
+        .rec-details {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.75);
+            margin-top: 6px;
+        }
+
+        .rec-details summary {
+            cursor: pointer;
+            color: rgba(255, 255, 255, 0.6);
+            font-weight: 700;
+            padding: 4px 0;
+            outline: none;
+        }
+
+        .rec-details ul {
+            margin: 4px 0 6px 0;
+            padding-left: 18px;
+        }
+
+        .rec-details li {
+            margin-bottom: 2px;
+        }
+
+        .rec-details .factor-name {
+            color: #b8ffd8;
+            font-weight: 700;
+        }
+
+        .rec-details .factor-imp {
+            color: rgba(255, 255, 255, 0.45);
+            font-style: italic;
+        }
+
+        .rec-details p {
+            margin: 6px 0;
+            line-height: 1.4;
+        }
+
+        .feedback-section {
+            display: none;
+            border-top: 1px solid rgba(255, 255, 255, 0.10);
+            padding-top: 10px;
+            margin-top: 4px;
+        }
+
+        .feedback-prompt {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.75);
+            font-weight: 700;
+            margin: 0 0 8px 0;
+        }
+
+        .feedback-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .fb-good {
+            background: linear-gradient(135deg, #00a96b, #69ff9c);
+            color: #06130c;
+        }
+
+        .fb-bad {
+            background: linear-gradient(135deg, #d63b3b, #ff7a59);
+        }
+
+        #feedback-notes {
+            margin-top: 8px;
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            background: rgba(0, 0, 0, 0.25);
+            color: white;
+            font-size: 13px;
+            font-family: inherit;
+            outline: none;
+        }
+
+        #feedback-notes::placeholder {
+            color: rgba(255, 255, 255, 0.35);
+        }
+
+        #feedback-notes:focus {
+            border-color: rgba(101, 255, 174, 0.5);
+        }
+
+        .feedback-toast {
+            margin-top: 8px;
+            font-size: 12px;
+            font-weight: 700;
+            min-height: 16px;
+        }
+
+        .feedback-toast.is-good {
+            color: #65ffae;
+        }
+
+        .feedback-toast.is-error {
+            color: #ff9f9f;
+        }
+
+        .feedback-stats {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.45);
+            font-weight: 600;
+            text-align: center;
+            padding: 4px 0 2px;
+        }
+
+        .rec-loading {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.55);
+            font-style: italic;
+            padding: 6px 0;
+        }
+
+        .rec-error {
+            font-size: 13px;
+            color: #ff9f9f;
+            padding: 6px 0;
+        }
+
+        @media screen and (orientation: landscape) {
+            .app-shell {
+                padding: 6px 10px;
+                max-width: none;
+            }
+
+            .top-bar {
+                padding: 3px 4px 6px;
+            }
+
+            h1 {
+                font-size: 20px;
+            }
+
+            .subtitle {
+                font-size: 11px;
+                margin-top: 2px;
+            }
+
+            #status {
+                font-size: 11px;
+                padding: 6px 9px;
+            }
+
+            .main-layout {
+                flex-direction: row;
+                justify-content: center;
+                align-items: stretch;
+                gap: 10px;
+            }
+
+            .camera-card {
+                max-width: none;
+                width: 42%;
+                padding: 8px;
+                border-radius: 18px;
+            }
+
+            .control-card {
+                max-width: none;
+                width: 28%;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                padding: 8px;
+                border-radius: 18px;
+            }
+
+            .water-card {
+                max-width: none;
+                width: 30%;
+                padding: 8px;
+                border-radius: 18px;
+                display: flex;
+                flex-direction: column;
+            }
+
+            .camera-header,
+            .control-header,
+            .water-header {
+                padding-bottom: 5px;
+                font-size: 12px;
+            }
+
+            .live-pill,
+            .ai-pill {
+                font-size: 10px;
+                padding: 3px 7px;
+            }
+
+            .camera-box {
+                height: 64vh;
+                max-height: none;
+                min-height: 0;
+                border-radius: 14px;
+            }
+
+            .main {
+                gap: 6px;
+            }
+
+            #joystick-area {
+                width: 135px;
+                height: 135px;
+            }
+
+            #stick {
+                width: 46px;
+                height: 46px;
+                left: 44.5px;
+                top: 44.5px;
+            }
+
+            .command-display {
+                font-size: 12px;
+            }
+
+            #current-command {
+                min-width: 24px;
+                padding: 2px 7px;
+            }
+
+            .buttons {
+                gap: 5px;
+            }
+
+            button {
+                font-size: 12px;
+                padding: 8px 4px;
+                border-radius: 11px;
+                min-width: 0;
+            }
+
+            .get-rec-btn {
+                font-size: 12px;
+                padding: 10px 6px;
+            }
+
+            .rec-headline {
+                font-size: 15px;
+            }
+
+            .rec-result {
+                padding: 10px;
+                border-radius: 12px;
+            }
+
+            .water-body {
+                gap: 8px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-shell">
+        <div class="top-bar">
+            <div class="title-block">
+                <h1>Grows Rover Control</h1>
+                <div class="subtitle">Live camera · joystick drive · pump and seeding</div>
+            </div>
+
+            <div id="status">Checking server...</div>
+        </div>
+
+        <div class="main-layout">
+            <div class="camera-card">
+                <div class="camera-header">
+                    <span>Camera Feed</span>
+                    <span class="live-pill">LIVE</span>
+                </div>
+
+                <div class="camera-box">
+                    <img src="/video_feed" id="camera-feed">
+                </div>
+            </div>
+
+            <div class="control-card">
+                <div class="control-header">
+                    <span>Drive Control</span>
+                    <span>Touch joystick</span>
+                </div>
+
+                <div class="main">
+                    <div id="joystick-area">
+                        <div id="stick"></div>
+                    </div>
+
+                    <div class="command-display">
+                        Command:<span id="current-command">s</span>
+                    </div>
+
+                    <div class="buttons">
+                        <button class="pump" onclick="sendCommand('p')">Pump</button>
+                        <button class="seed" onclick="sendCommand('m')">Seeding</button>
+                        <button class="seed-stop" onclick="sendCommand('v')">Stop</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="water-card">
+                <div class="water-header">
+                    <span>Watering Advisor</span>
+                    <span class="ai-pill">AI</span>
+                </div>
+
+                <div class="water-body">
+                    <button id="get-rec-btn" class="get-rec-btn" onclick="getRecommendation()">
+                        Get Recommendation
+                    </button>
+
+                    <div id="rec-result" class="rec-result">
+                        <h3 id="rec-headline" class="rec-headline"></h3>
+                        <div id="rec-confidence" class="rec-confidence"></div>
+                        <details class="rec-details">
+                            <summary>Why this recommendation?</summary>
+                            <p>Top factors:</p>
+                            <ul id="rec-factors"></ul>
+                            <p id="rec-weather"></p>
+                        </details>
+                    </div>
+
+                    <div id="rec-message"></div>
+
+                    <div id="feedback-section" class="feedback-section">
+                        <p class="feedback-prompt">Was this recommendation helpful?</p>
+                        <div class="feedback-buttons">
+                            <button class="fb-good" onclick="sendFeedback('good')">👍 Good</button>
+                            <button class="fb-bad" onclick="sendFeedback('bad')">👎 Bad</button>
+                        </div>
+                        <input id="feedback-notes" type="text" placeholder="Optional notes...">
+                        <div id="feedback-toast" class="feedback-toast"></div>
+                    </div>
+
+                    <div id="feedback-stats" class="feedback-stats"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============== Joystick (unchanged) ==============
+        const joystick = document.getElementById("joystick-area");
+        const stick = document.getElementById("stick");
+        const currentCommand = document.getElementById("current-command");
+        const statusText = document.getElementById("status");
+
+        let centerX = 92.5;
+        let centerY = 92.5;
+        let maxDistance = 61.5;
+        let active = false;
+        let lastCmd = "s";
+
+        function updateJoystickSizing() {
+            const size = joystick.offsetWidth;
+            const stickSize = stick.offsetWidth;
+            centerX = size / 2;
+            centerY = size / 2;
+            maxDistance = (size - stickSize) / 2;
+        }
+
+        function sendCommand(cmd) {
+            currentCommand.innerText = cmd;
+            fetch("/command", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ cmd: cmd })
+            })
+            .then(response => response.json())
+            .then(data => { console.log(data); })
+            .catch(error => { console.error("Error:", error); });
+        }
+
+        function moveStick(x, y) {
+            updateJoystickSizing();
+            const rect = joystick.getBoundingClientRect();
+            let touchX = x - rect.left;
+            let touchY = y - rect.top;
+            let dx = touchX - centerX;
+            let dy = touchY - centerY;
+            let distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance > maxDistance) {
+                dx = dx / distance * maxDistance;
+                dy = dy / distance * maxDistance;
+            }
+
+            const stickRadius = stick.offsetWidth / 2;
+            stick.style.left = (centerX + dx - stickRadius) + "px";
+            stick.style.top = (centerY + dy - stickRadius) + "px";
+
+            let cmd = getCommand(dx, dy);
+            if (cmd !== lastCmd) {
+                lastCmd = cmd;
+                sendCommand(cmd);
+            }
+        }
+
+        function getCommand(dx, dy) {
+            const deadzone = 18;
+            if (Math.abs(dx) < deadzone && Math.abs(dy) < deadzone) return "s";
+            if (Math.abs(dy) > Math.abs(dx)) {
+                return dy < 0 ? "f" : "b";
+            } else {
+                return dx < 0 ? "l" : "r";
+            }
+        }
+
+        function resetStick() {
+            updateJoystickSizing();
+            const stickRadius = stick.offsetWidth / 2;
+            stick.style.left = (centerX - stickRadius) + "px";
+            stick.style.top = (centerY - stickRadius) + "px";
+            if (lastCmd !== "s") {
+                lastCmd = "s";
+                sendCommand("s");
+            }
+        }
+
+        joystick.addEventListener("touchstart", function(e) {
+            active = true;
+            moveStick(e.touches[0].clientX, e.touches[0].clientY);
+        });
+
+        joystick.addEventListener("touchmove", function(e) {
+            e.preventDefault();
+            if (active) moveStick(e.touches[0].clientX, e.touches[0].clientY);
+        }, { passive: false });
+
+        joystick.addEventListener("touchend", function() {
+            active = false;
+            resetStick();
+        });
+
+        joystick.addEventListener("touchcancel", function() {
+            active = false;
+            resetStick();
+        });
+
+        joystick.addEventListener("mousedown", function(e) {
+            active = true;
+            moveStick(e.clientX, e.clientY);
+        });
+
+        document.addEventListener("mousemove", function(e) {
+            if (active) moveStick(e.clientX, e.clientY);
+        });
+
+        document.addEventListener("mouseup", function() {
+            if (active) {
+                active = false;
+                resetStick();
+            }
+        });
+
+        window.addEventListener("resize", resetStick);
+
+        function checkStatus() {
+            fetch("/status")
+            .then(response => response.json())
+            .then(data => {
+                if (data.connected) {
+                    statusText.innerText = "Connected to server";
+                    statusText.style.color = "#65ffae";
+                    statusText.style.borderColor = "rgba(101, 255, 174, 0.35)";
+                } else {
+                    statusText.innerText = "Server not connected";
+                    statusText.style.color = "#ff7777";
+                    statusText.style.borderColor = "rgba(255, 119, 119, 0.35)";
+                }
+            })
+            .catch(() => {
+                statusText.innerText = "Server error";
+                statusText.style.color = "#ff7777";
+                statusText.style.borderColor = "rgba(255, 119, 119, 0.35)";
+            });
+        }
+
+        // ============== Watering recommendation ==============
+        async function getRecommendation() {
+            const btn = document.getElementById("get-rec-btn");
+            const result = document.getElementById("rec-result");
+            const message = document.getElementById("rec-message");
+            const fbSection = document.getElementById("feedback-section");
+            const fbToast = document.getElementById("feedback-toast");
+
+            btn.disabled = true;
+            btn.innerText = "Loading...";
+            result.style.display = "none";
+            fbSection.style.display = "none";
+            fbToast.innerText = "";
+            message.innerHTML = '<div class="rec-loading">Fetching weather and running model...</div>';
+
+            try {
+                const res = await fetch("/water_recommendation");
+                const data = await res.json();
+
+                if (data.error) {
+                    message.innerHTML = `<div class="rec-error">Error: ${data.error}</div>`;
+                    return;
+                }
+
+                message.innerHTML = "";
+
+                const isWater = data.recommendation === "water";
+                result.classList.remove("is-water", "is-skip");
+                result.classList.add(isWater ? "is-water" : "is-skip");
+
+                const icon = isWater ? "💧" : "✅";
+                const action = isWater ? "Water your plants" : "Skip watering";
+                document.getElementById("rec-headline").innerText = `${icon} ${action}`;
+                document.getElementById("rec-confidence").innerHTML =
+                    `Confidence: <strong>${(data.confidence * 100).toFixed(0)}%</strong>`;
+
+                const factorsHtml = data.top_factors.map(f =>
+                    `<li><span class="factor-name">${f.feature}</span>: ${f.value}
+                     <span class="factor-imp">(importance: ${f.importance})</span></li>`
+                ).join("");
+                document.getElementById("rec-factors").innerHTML = factorsHtml;
+
+                const w = data.weather;
+                document.getElementById("rec-weather").innerHTML =
+                    `Today: ${w.temperature_2m_mean?.toFixed(1)}°C avg
+                     (${w.temperature_2m_min?.toFixed(1)}–${w.temperature_2m_max?.toFixed(1)}°C),
+                     ${w.relative_humidity_2m_mean?.toFixed(0)}% humidity.<br>
+                     Rain: ${w.rain_last_24h?.toFixed(1)}mm in 24h,
+                     ${w.rain_last_7d?.toFixed(1)}mm in 7d,
+                     ${w.days_since_rain} days since rain.`;
+
+                result.style.display = "block";
+                fbSection.style.display = "block";
+                refreshFeedbackStats();
+            } catch (e) {
+                message.innerHTML = `<div class="rec-error">Network error: ${e.message}</div>`;
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Get Recommendation";
+            }
+        }
+
+        async function sendFeedback(label) {
+            const notes = document.getElementById("feedback-notes").value;
+            const toast = document.getElementById("feedback-toast");
+            try {
+                const res = await fetch("/feedback", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ label, notes })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    toast.innerText = "Thanks! Feedback recorded.";
+                    toast.className = "feedback-toast is-good";
+                    document.getElementById("feedback-notes").value = "";
+                    refreshFeedbackStats();
+                } else {
+                    toast.innerText = `Error: ${data.error}`;
+                    toast.className = "feedback-toast is-error";
+                }
+            } catch (e) {
+                toast.innerText = `Network error: ${e.message}`;
+                toast.className = "feedback-toast is-error";
+            }
+        }
+
+        async function refreshFeedbackStats() {
+            try {
+                const res = await fetch("/feedback_stats");
+                const data = await res.json();
+                document.getElementById("feedback-stats").innerText =
+                    `Feedback collected: ${data.total} total (${data.good} good, ${data.bad} bad)`;
+            } catch (e) { /* silent */ }
+        }
+
+        resetStick();
+        checkStatus();
+        setInterval(checkStatus, 3000);
+        refreshFeedbackStats();
+    </script>
+</body>
+</html>
